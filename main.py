@@ -1,6 +1,9 @@
+from os import replace
 import torch
-print(torch.__version__)
-exit(0)
+from torch.utils.tensorboard.summary import scalar
+from datetime import datetime
+# print(torch.__version__)
+# exit(0)
 import torchvision.transforms.functional as F
 import torch.optim as opt
 import torchvision
@@ -13,19 +16,22 @@ from Generator import Generator
 from lib.solvers import anderson, broyden
 import matplotlib.pyplot as plt
 import numpy as np
+from glob import glob
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
 FILENAME = 'gen1.pth.tar'
 DISC_MODEL = 'disc.pth.tar'
-LOAD_MODEL = True
+LOAD_MODEL = False
+TRAIN = True
 
-lr = 1e-4
+lr = 5e-5
 image_size = 64
 batch_size = 1
-num_epochs = 10
+num_epochs = 22
 features_disc = 32
 features_gen = 64
-critic_iterations = 3
+critic_iterations = 5
 lambda_ = 10
 z_dim = 100
 
@@ -43,20 +49,26 @@ transforms = transforms.Compose(
 )
 
 #dataset = datasets.Celeba(root="dataset/", train=True, transform=transforms, download=True)
-dataset = datasets.ImageFolder(root="dataset/celeb_dataset", transform=transforms)
+# dataset = datasets.ImageFolder(root="dataset/celeb_dataset", transform=transforms)
+# breed_dirs = glob('../Images/*/')
+# dataset = datasets.ImageFolder(root='../Images', transform=transforms)
+# dataset = torch.utils.data.Subset(dataset, np.random.choice(range(len(dataset)), 14000, replace=False))
+
+dataset = datasets.ImageFolder(root='../sprites/pokemon-white', transform=transforms)
+
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 disc = Discriminator(num_branches, num_channels, features_disc, image_size).to(device)
 gen = Generator(num_branches, num_channels, f_solver, b_solver, f_thres, b_thres, features_gen, z_dim).to(device)
 
-opt_disc = opt.Adam(disc.parameters(), lr=lr, betas=(0,0.9))
-opt_gen = opt.Adam(gen.parameters(), lr=lr, betas=(0,0.9))
+# opt_disc = opt.Adam(disc.parameters(), lr=lr, betas=(0,0.9))
+# opt_gen = opt.Adam(gen.parameters(), lr=lr, betas=(0,0.9))
+opt_disc = opt.RMSprop(disc.parameters(), lr=lr)
+opt_gen = opt.RMSprop(disc.parameters(), lr=lr)
 
+fixed_noise = torch.randn(8, z_dim, 1, 1).to(device)
 
-fixed_noise = torch.randn(batch_size, z_dim, 1, 1).to(device)
-
-write_fake = SummaryWriter(f"runs/IGANGP_MNIST/fake")
-write_real = SummaryWriter(f"runs/IGANGP_MNIST/real")
+write_fake = SummaryWriter(f'runs/pokemon/{datetime.now().strftime("%m-%d-%Y-%H%M%S")}',flush_secs=1)
 
 
 def gradient_penalty(disc, real, fake, device="cpu"):
@@ -130,8 +142,8 @@ def train():
             for _ in range(critic_iterations):
                 noise = torch.randn(batch_size, z_dim, 1, 1).to(device)
                 fake = gen(noise)
-                print(fake[0])
-                exit(0)
+                # print(fake[0])
+                # exit(0)
 
                 #fake, jac_loss = gen(noise)
                 #jac_loss = jac_loss.mean()
@@ -177,29 +189,41 @@ def train():
                     img_grid_fake = torchvision.utils.make_grid(
                         fake[:8], normalize=True
                     )
-
-                    write_real.add_image("Real", img_grid_real, global_step=step)
+                    write_fake.add_scalar('lossD',lossD, global_step=step)
+                    write_fake.add_scalar('lossG',lossG, global_step=step)
+                    write_fake.add_image("Real", img_grid_real, global_step=step)
                     write_fake.add_image("Fake", img_grid_fake, global_step=step)
 
                 step += 1
 
 
 def test():
-    if LOAD_MODEL:
-        checkpoint = torch.load(FILENAME)
-        gen.load_state_dict(checkpoint['state_dict'])
+    checkpoint = torch.load(FILENAME)
+    gen.load_state_dict(checkpoint['state_dict'])
     gen.eval()
-    noise = torch.randn(1, z_dim, 1, 1).to(device)
-    fake = gen(noise)
-    print(fake[0])
-    fake = fake[0].detach().cpu()
-    fake = np.squeeze(fake, axis=0)
-    fake = fake.permute(1, 2, 0)
-    plt.imshow(fake)
-    exit(0)
+    noise = torch.randn(32, z_dim, 1, 1).to(device)
+    with torch.no_grad():
+        fake = gen(noise)
+        fake=fake[0]
+        print(fake.shape)
+        img_grid_fake = torchvision.utils.make_grid(
+                            fake, normalize=True)
+        write_fake.add_image("Test", img_grid_fake)
+        write_fake.close()
+    # fake = fake[2].detach().cpu()
+    # fake = np.squeeze(fake, axis=0)
+    # fake = fake.permute(1, 2, 0)
+    # for i in range(fake.shape[2]):
+    #     fake[:,:,i] = (fake[:,:,i]+fake[:,:,i].min()).max()
+    # plt.imshow(fake)
+    # plt.show()
+    # exit(0)
 
 
 if __name__ == '__main__':
     train()
+    test()
 
 
+# print(torch.__version__)
+# exit(0)

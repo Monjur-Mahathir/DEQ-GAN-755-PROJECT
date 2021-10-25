@@ -54,7 +54,7 @@ class Generator(nn.Module):
 
     def forward(self, x):
         x = self.init_gen(x)
-        print(x.shape)
+        # print(x.shape)
 
         x_list = [x]
         for i in range(1, self.num_branches):

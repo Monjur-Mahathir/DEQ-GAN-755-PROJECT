@@ -5,3 +5,5 @@ runs/pokemon
 runs/dogs
 first-run/
 lib/__pycache__
+out*/
+__pycache__/

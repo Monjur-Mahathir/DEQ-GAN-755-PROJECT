@@ -114,6 +114,7 @@ def matvec(part_Us, part_VTs, x):
 
 
 def broyden(f, x0, threshold, eps=1e-3, stop_mode="rel", ls=False, name="unknown"):
+    # print(name)
     bsz, total_hsize, seq_len = x0.size()
     g = lambda y: f(y) - y
     dev = x0.device

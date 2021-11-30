@@ -2,6 +2,7 @@ from os import replace, path
 import torch
 from torch.utils.tensorboard.summary import scalar
 from datetime import datetime
+import subprocess
 # print(torch.__version__)
 # exit(0)
 import torchvision.transforms.functional as F
@@ -24,9 +25,9 @@ print(device)
 LOAD_MODEL = False
 TRAIN = True
 
-lr = 1e-4
+lr = 2e-4
 image_size = 64
-num_epochs = 200
+num_epochs = 50
 features_disc = 32
 features_gen = 64
 critic_iterations = 5
@@ -34,7 +35,7 @@ batch_size = critic_iterations
 lambda_ = 10
 z_dim = 100
 
-num_branches = 3
+num_branches = 1
 num_channels = [3, 3, 3]
 f_solver = eval('broyden')
 b_solver = eval('broyden')
@@ -47,12 +48,14 @@ transforms = transforms.Compose(
     )]
 )
 
-#dataset = datasets.Celeba(root="dataset/", train=True, transform=transforms, download=True)
+# dataset = datasets.Celeba(root="dataset/", train=True, transform=transforms, download=True)
 # dataset = datasets.ImageFolder(root="dataset/celeb_dataset", transform=transforms)
 # breed_dirs = glob('../Images/*/')
 # dataset = datasets.ImageFolder(root='../Images', transform=transforms)
 # dataset = torch.utils.data.Subset(dataset, np.random.choice(range(len(dataset)), 14000, replace=False))
+
 filedir = '../sprites/pokemon-white'
+# filedir = '../lfw-deepfunneled/lfw-deepfunneled'
 dataset = datasets.ImageFolder(root=filedir, transform=transforms)
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
@@ -69,10 +72,28 @@ opt_gen = opt.Adam(gen.parameters(), lr=lr, betas=(0.9,0.99))
 # opt_disc = opt.RMSprop(disc.parameters(), lr=lr)
 # opt_gen = opt.RMSprop(disc.parameters(), lr=lr)
 
-fixed_noise = torch.randn(16, z_dim, 1, 1).to(device)
+fixed_noise = torch.randn(32, z_dim, 1, 1).to(device)
 
 write_fake = SummaryWriter(savedir, flush_secs=1)
 
+def get_gpu_memory_map():
+    """Get the current gpu usage.
+
+    Returns
+    -------
+    usage: dict
+        Keys are device ids as integers.
+        Values are memory usage as integers in MB.
+    """
+    result = subprocess.check_output(
+        [
+            'nvidia-smi', '--query-gpu=memory.used',
+            '--format=csv,nounits,noheader'
+        ], encoding='utf-8')
+    # Convert lines into a dictionary
+    gpu_memory = [int(x) for x in result.strip().split('\n')]
+    gpu_memory_map = dict(zip(range(len(gpu_memory)), gpu_memory))
+    return gpu_memory_map
 
 def gradient_penalty(disc, real, fake, device="cpu"):
     #interpolated_images = real[0] * alpha + fake[0] * (1 - alpha)
@@ -205,18 +226,20 @@ def train():
                     write_fake.add_scalar('lossG',lossG, global_step=step)
                     write_fake.add_image("Real", img_grid_real, global_step=step)
                     write_fake.add_image("Fake", img_grid_fake, global_step=step)
-
+                    # write_fake.add_scalar("GPU memory usage", get_gpu_memory_map()[0], global_step=step)
+                    write_fake.add_scalar("GPU max memory allocated", torch.cuda.max_memory_allocated(device), global_step=step)
                 step += 1
 
     return savedir
 
 
 def test(loaddir):
-    # loaddir = 'runs/pokemon/10-18-2021-185249'
-    write_fake = SummaryWriter(loaddir, flush_secs=1)
+    # loaddir = 'runs/pokemon/11-28-2021-164654'
+    write_fake = SummaryWriter(savedir, flush_secs=1)
     checkpoint = torch.load(path.join(loaddir, 'gen1.pth.tar'))
     gen.load_state_dict(checkpoint['state_dict'])
-    gen.eval()
+    print(checkpoint['state_dict'])
+    # gen.eval()
     noise = torch.randn(32, z_dim, 1, 1).to(device)
     with torch.no_grad():
         fake = gen(noise)
@@ -224,6 +247,7 @@ def test(loaddir):
         img_grid_fake = torchvision.utils.make_grid(
                             fake, normalize=True)
         write_fake.add_image("Test", img_grid_fake)
+        write_fake.flush()
         write_fake.close()
     # fake = fake[2].detach().cpu()
     # fake = np.squeeze(fake, axis=0)

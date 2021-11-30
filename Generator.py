@@ -66,7 +66,7 @@ class Generator(nn.Module):
 
         func = lambda z: list2vec(self.fullstage(vec2list(z, cutoffs), x_list))
 
-        #jac_loss = torch.tensor(0.0).to(x)
+        # jac_loss = torch.tensor(0.0).to(x)
 
         with torch.no_grad():
             res = self.f_solver(func, z1, threshold=self.f_thres, stop_mode='abs')
@@ -74,23 +74,24 @@ class Generator(nn.Module):
 
         new_z1 = z1
         new_z1 = func(z1.requires_grad_())
+        
+        # jac_loss = jac_loss_estimate(new_z1, z1)
+        
+        # if self.training:
+        #     def backward_hook(grad):
+        #         if self.hook is not None:
+        #             self.hook.remove()
+        #             torch.cuda.synchronize()
+        #         result = self.b_solver(lambda y: autograd.grad(new_z1, z1, y, retain_graph=True)[0] + grad,
+        #                             torch.zeros_like(grad),
+        #                             threshold=self.b_thres, stop_mode='abs', name="backward")
+        #         print(result['result'].shape)
+        #         return result['result']
 
-        #jac_loss = jac_loss_estimate(new_z1, z1)
-
-        '''
-        def backward_hook(grad):
-            if self.hook is not None:
-                self.hook.remove()
-                torch.cuda.synchronize()
-            result = self.b_solver(lambda y: autograd.grad(new_z1, z1, y, retain_graph=True)[0] + grad,
-                                   torch.zeros_like(grad),
-                                   threshold=self.b_thres, stop_mode='abs', name="backward")
-            return result['result']
-
-        self.hook = new_z1.register_hook(backward_hook)
-        '''
+        #     self.hook = new_z1.register_hook(backward_hook)
+        
         y_list = self.iodrop(vec2list(new_z1, cutoffs))
-        #return y_list, jac_loss.view(1, -1)
+        # return y_list, jac_loss.view(1, -1)
         return y_list
 
 '''

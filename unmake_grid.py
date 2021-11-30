@@ -1,6 +1,9 @@
 import numpy as np
 from matplotlib.image import imread, imsave
 from os import path
+"""
+Take a Tensorboard image grid and separate it into separate image files.
+"""
 
 imfile = '/home/ehrensam/Downloads/beta0.png'
 grid = imread(imfile)

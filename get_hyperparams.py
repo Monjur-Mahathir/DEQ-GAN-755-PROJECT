@@ -2,6 +2,7 @@ import torch
 from Generator import Generator
 from lib.solvers import anderson, broyden
 
+# Find training hyperparameters in checkpoint files.
 
 checkpoint = torch.load('runs/pokemon/11-28-2021-161708/gen1.pth.tar')
 network = Generator(3, [3,3,3], eval('broyden'), eval('broyden'), 30, 40, 64, 100).to('cuda')
